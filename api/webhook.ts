@@ -9,12 +9,34 @@ import type { InstagramWebhookPayload } from '../src/types/meta.js';
 
 const logger = new Logger('WebhookRouter');
 
-// Disable Vercel's automatic body parser if raw body is needed, or handle both formats
+// Disable Vercel's automatic body parser to preserve raw payload for HMAC SHA-256 verification
 export const config = {
   api: {
-    bodyParser: true,
+    bodyParser: false,
   },
 };
+
+/**
+ * Extracts the exact, untampered raw bytes from the incoming HTTP stream.
+ */
+async function getRawBodyBuffer(req: VercelRequest): Promise<Buffer> {
+  if (Buffer.isBuffer(req.body)) {
+    return req.body;
+  }
+  if (typeof req.body === 'string') {
+    return Buffer.from(req.body, 'utf8');
+  }
+  if ((req as any).rawBody) {
+    return Buffer.isBuffer((req as any).rawBody)
+      ? (req as any).rawBody
+      : Buffer.from((req as any).rawBody);
+  }
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks);
+}
 
 /**
  * Meta Webhook Router & Verification Endpoint
@@ -55,18 +77,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Read raw body stream for exact byte-for-byte HMAC validation
+    const rawBuffer = await getRawBodyBuffer(req);
+
     // Security: Validate HMAC SHA-256 signature
     const signature =
       (req.headers['x-hub-signature-256'] as string) ||
       (req.headers['x-hub-signature'] as string);
 
-    // Get raw body payload for HMAC computation
-    const rawBody =
-      (req as any).rawBody ||
-      (typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
-
     const isSignatureValid = validateMetaSignature({
-      rawBody,
+      rawBody: rawBuffer,
       signatureHeader: signature,
       appSecret: envConfig.META_APP_SECRET,
     });
@@ -78,8 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(403).json({ error: 'Invalid HMAC signature' });
     }
 
-    const payload: InstagramWebhookPayload =
-      typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const payload: InstagramWebhookPayload = JSON.parse(rawBuffer.toString('utf8'));
 
     logger.info('Authenticated Meta webhook payload received', {
       object: payload?.object,
