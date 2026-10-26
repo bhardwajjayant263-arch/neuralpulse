@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "simulate": "tsx src/scripts/simulate.ts",
     "lint": "tsc --noEmit"
   },
   "keywords": [
