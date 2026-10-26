@@ -4,6 +4,7 @@
   "description": "Production-ready Node.js/TypeScript backend for neuralpulse.hq with Vercel Serverless, Vercel KV, and Gemini LLM",
   "main": "api/index.js",
   "scripts": {
+    "dev": "tsx src/dev-server.ts",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
