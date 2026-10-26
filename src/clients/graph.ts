@@ -1,5 +1,6 @@
 import { CONSTANTS } from '../config/constants.js';
 import { getEnvConfig } from '../config/env.js';
+import { kvClient } from './kv.js';
 import { withExponentialBackoff } from '../utils/backoff.js';
 import { Logger } from '../utils/logger.js';
 import type {
@@ -47,6 +48,22 @@ export class MetaGraphClient {
     this.igUserId = options?.igUserId || config.META_IG_USER_ID;
   }
 
+  /**
+   * Resolves token and Instagram User ID, falling back to active OAuth session in KV.
+   */
+  async resolveCredentials(): Promise<{ token: string; igUserId: string }> {
+    if (this.accessToken && !this.accessToken.includes('placeholder')) {
+      return { token: this.accessToken, igUserId: this.igUserId };
+    }
+
+    const kvAuth = await kvClient.getInstagramAuth();
+    if (kvAuth && kvAuth.access_token) {
+      return { token: kvAuth.access_token, igUserId: kvAuth.ig_user_id };
+    }
+
+    return { token: this.accessToken, igUserId: this.igUserId };
+  }
+
   private getEndpointUrl(path: string): string {
     const cleanPath = path.startsWith('/') ? path.slice(1) : path;
     return `${this.baseUrl}/${this.version}/${cleanPath}`;
@@ -58,12 +75,16 @@ export class MetaGraphClient {
       method?: 'GET' | 'POST' | 'DELETE';
       params?: Record<string, string>;
       body?: Record<string, any>;
+      tokenOverride?: string;
     } = {}
   ): Promise<T> {
+    const creds = await this.resolveCredentials();
+    const token = options.tokenOverride || creds.token;
+
     const url = new URL(this.getEndpointUrl(endpoint));
 
     // Append standard access token and query params
-    url.searchParams.append('access_token', this.accessToken);
+    url.searchParams.append('access_token', token);
     if (options.params) {
       for (const [key, value] of Object.entries(options.params)) {
         if (value !== undefined && value !== null) {
@@ -149,7 +170,8 @@ export class MetaGraphClient {
       }
     }
 
-    const res = await this.request<MetaContainerResponse>(`${this.igUserId}/media`, {
+    const { igUserId } = await this.resolveCredentials();
+    const res = await this.request<MetaContainerResponse>(`${igUserId}/media`, {
       method: 'POST',
       params: queryParams,
     });
@@ -172,7 +194,8 @@ export class MetaGraphClient {
    */
   async publishMedia(creationId: string): Promise<string> {
     logger.info('Publishing media container', { creationId });
-    const res = await this.request<MetaMediaPublishResponse>(`${this.igUserId}/media_publish`, {
+    const { igUserId } = await this.resolveCredentials();
+    const res = await this.request<MetaMediaPublishResponse>(`${igUserId}/media_publish`, {
       method: 'POST',
       params: { creation_id: creationId },
     });
@@ -207,8 +230,9 @@ export class MetaGraphClient {
     }
 
     logger.info('Sending Direct Message via Graph API', { recipient: recipientPayload });
+    const { igUserId } = await this.resolveCredentials();
 
-    return await this.request<MetaSendDMResponse>(`${this.igUserId}/messages`, {
+    return await this.request<MetaSendDMResponse>(`${igUserId}/messages`, {
       method: 'POST',
       body: {
         recipient: recipientPayload,

@@ -18,6 +18,8 @@ export const KV_KEY_PREFIX = {
   DM_HISTORY: (userId: string) => `dm_history:${userId}`,
   PROCESSED_COMMENT: (commentId: string) => `comment_processed:${commentId}`,
   WEBHOOK_DEDUP: (eventId: string) => `webhook_dedup:${eventId}`,
+  INSTAGRAM_AUTH: 'instagram_auth:active',
+  OAUTH_STATE: (state: string) => `oauth_state:${state}`,
 } as const;
 
 export interface IKVStore {

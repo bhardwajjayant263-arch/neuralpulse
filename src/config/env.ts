@@ -6,11 +6,13 @@ dotenv.config();
 
 const envSchema = z.object({
   // Meta Configuration
+  META_APP_ID: z.string().default('placeholder_app_id'),
   META_APP_SECRET: z.string().default('placeholder_secret_for_dev'),
   META_VERIFY_TOKEN: z.string().default('neuralpulse_verify_token'),
   META_ACCESS_TOKEN: z.string().default('placeholder_access_token'),
   META_IG_USER_ID: z.string().default('placeholder_ig_user_id'),
   GRAPH_API_VERSION: z.string().default('v21.0'),
+  APP_BASE_URL: z.string().default('http://localhost:3000'),
 
   // Gemini Generative AI Configuration
   GEMINI_API_KEY: z.string().default('placeholder_gemini_api_key'),

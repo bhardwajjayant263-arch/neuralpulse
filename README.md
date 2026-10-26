@@ -45,7 +45,13 @@ Production-ready Node.js / TypeScript backend for **neuralpulse.hq** deployed on
 
 ## 🚀 Key Features
 
-1. **Asynchronous Daily Publisher & State Manager (`api/publish.ts` & `api/publish-status.ts`)**:
+1. **OAuth 2.0 "Login with Instagram" Engine (`api/auth/login.ts` & `api/auth/callback.ts`)**:
+   - **One-Click Connection Portal**: Navigate to `/api/auth/login` to authenticate via Meta's official OAuth 2.0 screen with CSRF state protection.
+   - **Token Upgrade**: Automatically exchanges authorization codes for 60-day Long-Lived Access Tokens.
+   - **Auto-Discovery**: Resolves connected Facebook Pages and links the active Instagram Business Account ID (`META_IG_USER_ID`) dynamically in Vercel KV.
+   - **Connection Status API**: Real-time status inspection at `/api/auth/status`.
+
+2. **Asynchronous Daily Publisher & State Manager (`api/publish.ts` & `api/publish-status.ts`)**:
    - **Post-Specific Trigger Mapping**: Accepts post content alongside `trigger_config` (trigger keyword, DM resource, and comment reply).
    - **Two-Step Async Publishing**: Initiates Meta container rendering and returns a polling ticket, avoiding Vercel serverless execution timeouts during Meta's video rendering pipeline.
    - **State Persistence**: Persists `trigger_map:${media_id}` in Vercel KV once published.

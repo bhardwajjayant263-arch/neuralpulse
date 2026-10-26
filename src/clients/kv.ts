@@ -3,6 +3,7 @@ import { CONSTANTS } from '../config/constants.js';
 import { KV_KEY_PREFIX, type ChatMessage, type IKVStore } from '../types/kv.js';
 import type { TriggerConfig } from '../types/triggers.js';
 import type { PublishJobRecord } from '../types/publish.js';
+import type { InstagramAuthRecord } from '../types/auth.js';
 import { Logger } from '../utils/logger.js';
 
 const logger = new Logger('KVClient');
@@ -177,6 +178,49 @@ export class NeuralPulseKV {
       return false;
     }
     return true;
+  }
+
+  /**
+   * OAuth CSRF State Management
+   */
+  async saveOAuthState(state: string): Promise<void> {
+    const key = KV_KEY_PREFIX.OAUTH_STATE(state);
+    // 15-minute TTL for OAuth authorization window
+    await this.store.set(key, true, { ex: 60 * 15 });
+  }
+
+  async verifyAndConsumeOAuthState(state: string): Promise<boolean> {
+    const key = KV_KEY_PREFIX.OAUTH_STATE(state);
+    const exists = await this.store.exists(key);
+    if (exists) {
+      await this.store.del(key);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Active Instagram OAuth Session: `instagram_auth:active`
+   */
+  async saveInstagramAuth(record: InstagramAuthRecord): Promise<void> {
+    // Retain for 60 days (or calculated until token expiry)
+    const ttlSeconds = Math.max(
+      60 * 60 * 24,
+      Math.floor((record.expires_at - Date.now()) / 1000)
+    );
+    await this.store.set(KV_KEY_PREFIX.INSTAGRAM_AUTH, record, { ex: ttlSeconds });
+    logger.info('Saved active Instagram OAuth session to KV', {
+      username: record.ig_username,
+      igUserId: record.ig_user_id,
+    });
+  }
+
+  async getInstagramAuth(): Promise<InstagramAuthRecord | null> {
+    return await this.store.get<InstagramAuthRecord>(KV_KEY_PREFIX.INSTAGRAM_AUTH);
+  }
+
+  async clearInstagramAuth(): Promise<void> {
+    await this.store.del(KV_KEY_PREFIX.INSTAGRAM_AUTH);
   }
 }
 
